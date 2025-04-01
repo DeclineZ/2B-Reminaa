@@ -38,8 +38,13 @@
           <div id="entryFormContainer">
             <form id="entryForm" enctype="multipart/form-data">
               <h3 id="formTitle">Add New Entry</h3>
-              <!-- Hidden field to track edit mode -->
+            
               <input type="hidden" name="entry_index" id="entry_index">
+            
+              <!-- NEW hidden input(s) for storing existing image/audio links -->
+              <input type="hidden" name="existing_img_link" id="existing_img_link">
+              <input type="hidden" name="existing_sound_link" id="existing_sound_link">
+            
               <label>
                 Upload Image:
                 <input type="file" name="img_file" accept="image/*">
@@ -125,13 +130,19 @@
         // Open the form in edit mode and fill with the entry data.
         function openEditForm(index) {
           const entry = entries[index];
+        
+          // Remember the index
           document.getElementById('entry_index').value = index;
-          document.querySelector('input[name="img_link"]').value = entry.img_link;
-          document.querySelector('input[name="sound"]').value = entry.sound;
-          document.querySelector('input[name="place_info"]').value = entry.place_info;
-          document.querySelector('input[name="people_info"]').value = entry.people_info;
-          document.querySelector('input[name="date_info"]').value = entry.date_info;
-          document.querySelector('textarea[name="event_info"]').value = entry.event_info;
+        
+          // Instead of trying to set the file input, store existing links in hidden inputs
+          document.getElementById('existing_img_link').value = entry.img_link || "";
+          document.getElementById('existing_sound_link').value = entry.sound || "";
+        
+          document.querySelector('input[name="place_info"]').value = entry.place_info || "";
+          document.querySelector('input[name="people_info"]').value = entry.people_info || "";
+          document.querySelector('input[name="date_info"]').value = entry.date_info || "";
+          document.querySelector('textarea[name="event_info"]').value = entry.event_info || "";
+        
           document.getElementById('formTitle').textContent = 'Edit Entry';
           showForm();
         }

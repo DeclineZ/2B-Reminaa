@@ -178,24 +178,48 @@ def add_entry():
 
 @app.route('/edit-entry', methods=['POST'])
 def edit_entry():
-    data = request.get_json()
-    index = data.get('index')
-    if index is None:
-        return jsonify({'success': False, 'error': 'Missing index'}), 400
-    new_entry = {
-        "img_link": data.get("img_link"),
-        "sound": data.get("sound"),
-        "place_info": data.get("place_info"),
-        "people_info": data.get("people_info"),
-        "date_info": data.get("date_info"),
-        "event_info": data.get("event_info")
-    }
+    # parse JSON normally if you're sending JSON,
+    # or parse FormData if you do it like the code above
+    index = request.form.get('entry_index', type=int)
+
     entries = load_data()
     if index < 0 or index >= len(entries):
         return jsonify({'success': False, 'error': 'Invalid index'}), 400
-    entries[index] = new_entry
+
+    # Grab existing links from hidden fields
+    existing_img_link = request.form.get('existing_img_link')
+    existing_sound_link = request.form.get('existing_sound_link')
+
+    # Check if new files were uploaded
+    img_file = request.files.get('img_file')
+    audio_file = request.files.get('audio_file')
+
+    if img_file and img_file.filename:  # user actually selected a new file
+        img_upload = cloudinary.uploader.upload(img_file, resource_type='image')
+        new_img_url = img_upload['secure_url']
+    else:
+        # keep old URL
+        new_img_url = existing_img_link
+
+    if audio_file and audio_file.filename:
+        audio_upload = cloudinary.uploader.upload(audio_file, resource_type='video')
+        new_sound_url = audio_upload['secure_url']
+    else:
+        new_sound_url = existing_sound_link
+
+    # Update the entry
+    entries[index] = {
+        "img_link": new_img_url,
+        "sound": new_sound_url,
+        "place_info": request.form.get("place_info"),
+        "people_info": request.form.get("people_info"),
+        "date_info": request.form.get("date_info"),
+        "event_info": request.form.get("event_info")
+    }
+
     save_data(entries)
     return jsonify({'success': True, 'entries': entries})
+
 
 @app.route('/delete-entry', methods=['POST'])
 def delete_entry():
