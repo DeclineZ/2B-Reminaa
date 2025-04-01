@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home</title>
+    <link rel="stylesheet" href="../static/styles.css">
+    <link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='../static/assets/bootstrap/css/bootstrap.min.css') }}"
+    >
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='../static/assets/fonts/fontawesome-all.min.css') }}"
+    >
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai+Looped&display=swap">
+    <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/png">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="logo">
+            <img src="https://c8.alamy.com/comp/ERAWHT/old-man-with-a-big-beard-and-a-smile-on-white-background-ERAWHT.jpg" alt="" style="max-height: 50px; border-radius: 50px;">
+            <strong>คุณตา สะเทือน</strong>
+        </div>
+        <div class="home"><a href="/" style="text-decoration:none; color: #7F8AFF; font-size: 35px">⏏</a></div>
+        <div class="profile">
+          <button onclick="window.location.href='/add_data'">+ สำหรับผู้ดูแล</button>
+        </div>
+      </nav>
+    <div class="contain">
+        <div class="title-div fade-in">
+            <h1 class="title color-text">RE</h1><h1 class="title">MINA</h1>
+        </div>
+
+        <p class="title subtitle fade-in-delayed" style="margin-left: 15px; margin-right: 15px;">Application ที่ขับเคลื่อนด้วย AI ในการทำการบำบัดด้วยความทรงจำ กดที่ปุ่มด้านล่างเพื่อเริ่มต้น</p>
+
+        <div class="fade-in-delayed">
+            <i class="far fa-play-circle start pulse" onclick="checkIfJsonFileIsEmpty('../data.json')"></i>
+        </div>
+    </div>
+    <div class="powered-by">powered by Typhoon V2</div>
+
+    <script src="assets/bootstrap/js/bootstrap.min.js"></script>
+    <script>
+        function checkIfJsonFileIsEmpty(jsonUrl) {
+            fetch(jsonUrl)
+              .then(response => {
+                if (!response.ok) {
+                  throw new Error('Network response was not ok');
+                }
+                return response.json();
+              })
+              .then(data => {
+                // Check if the object has no keys (empty object or array)
+                const isEmpty = 
+                  (Array.isArray(data) && data.length === 0) || 
+                  (typeof data === 'object' && Object.keys(data).length === 0);
+          
+                if (isEmpty) {
+                  alert("กรุณาเพิ่มข้อมูลก่อนเริ่มใช้งาน");
+                } else {
+                    window.location.href='/get_random'
+                }
+              })
+              .catch(error => {
+                console.error('Error fetching JSON:', error);
+              });
+          }
+    </script>
+</body> <script src="https://code.responsivevoice.org/responsivevoice.js?key=jFvG5zaR"></script>
+</html>

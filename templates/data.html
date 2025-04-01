@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>เพิ่มข้อมูล</title>
+    <link rel="stylesheet" href="../static/styles.css">
+    <link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='../static/assets/bootstrap/css/bootstrap.min.css') }}"
+    >
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='../static/assets/fonts/fontawesome-all.min.css') }}"
+    >
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai+Looped&display=swap">
+</head>
+<body>
+    
+    <nav class="navbar">
+        <div class="logo">
+            <img src="https://c8.alamy.com/comp/ERAWHT/old-man-with-a-big-beard-and-a-smile-on-white-background-ERAWHT.jpg" alt="" style="max-height: 50px; border-radius: 50px;">
+            <strong>คุณตา สะเทือน</strong>
+        </div>
+        <div class="home"><a href="/" style="text-decoration:none; color: #7F8AFF; font-size: 35px">  ⏏  </a></div>
+        <div class="profile">
+          <button onclick="window.location.href='/add_data'">+ สำหรับผู้ดูแล</button>
+        </div>
+      </nav>
+      <div class="contain2">
+        <header>
+            <button id="addEntryBtn">Add New Entry</button>
+          </header>
+        
+          <ul id="entryList"></ul>
+        
+          <!-- Modal Form for Adding/Editing -->
+          <div id="entryFormContainer">
+            <form id="entryForm" enctype="multipart/form-data">
+              <h3 id="formTitle">Add New Entry</h3>
+              <!-- Hidden field to track edit mode -->
+              <input type="hidden" name="entry_index" id="entry_index">
+              <label>
+                Upload Image:
+                <input type="file" name="img_file" accept="image/*">
+              </label>
+              <label>
+                Upload Audio:
+                <input type="file" name="audio_file" accept="audio/*">
+              </label>              
+              <label>
+                Place Info:
+                <input type="text" name="place_info" required>
+              </label>
+              <label>
+                People Info:
+                <input type="text" name="people_info">
+              </label>
+              <label>
+                Date Info:
+                <input type="date" name="date_info" required>
+              </label>
+              <label>
+                Event Info:
+                <textarea name="event_info" rows="3" required></textarea>
+              </label>
+              <div class="actions">
+                <button type="button" id="cancelBtn">Cancel</button>
+                <button type="submit" id="submitBtn">Save Entry</button>
+              </div>
+            </form>
+          </div>
+    </div>
+    <div class="powered-by">powered by Typhoon V2</div>
+
+    <script>
+        let entries = [];
+    
+        // Render the list of entries.
+        function renderEntries(data) {
+          entries = data;
+          const list = document.getElementById('entryList');
+          list.innerHTML = '';
+          entries.forEach((entry, index) => {
+            const li = document.createElement('li');
+            li.classList.add("entry-card", "fade-in-up");
+            li.innerHTML = `
+              <img src="${entry.img_link}" alt="Image" style="max-width:100%;height:100px;"><br>
+              <strong>Place:</strong> ${entry.place_info} <br>
+              <strong>People:</strong> ${entry.people_info} <br>
+              <strong>Date:</strong> ${entry.date_info} <br>
+              <strong>Event:</strong> ${entry.event_info} <br>
+              ${entry.sound ? `<audio controls style="width: 100%;">
+                <source src="${entry.sound}" type="audio/mpeg">
+                Your browser does not support the audio element.
+              </audio>` : ''}
+              <br>
+              <button class="edit-btn" onclick="openEditForm(${index})">Edit</button>
+              <button class="delete-btn" onclick="deleteEntry(${index})">Delete</button>
+            `;
+            list.appendChild(li);
+            
+          });
+        }
+    
+        // Load entries from the server.
+        function loadEntries() {
+          fetch('/data.json')
+            .then(response => response.json())
+            .then(data => renderEntries(data))
+            .catch(error => console.error('Error loading entries:', error));
+        }
+    
+        // Show and hide the modal form.
+        function showForm() {
+          document.getElementById('entryFormContainer').style.display = 'flex';
+        }
+        function hideForm() {
+          document.getElementById('entryFormContainer').style.display = 'none';
+          document.getElementById('entryForm').reset();
+          document.getElementById('entry_index').value = '';
+          document.getElementById('formTitle').textContent = 'Add New Entry';
+        }
+    
+        // Open the form in edit mode and fill with the entry data.
+        function openEditForm(index) {
+          const entry = entries[index];
+          document.getElementById('entry_index').value = index;
+          document.querySelector('input[name="img_link"]').value = entry.img_link;
+          document.querySelector('input[name="sound"]').value = entry.sound;
+          document.querySelector('input[name="place_info"]').value = entry.place_info;
+          document.querySelector('input[name="people_info"]').value = entry.people_info;
+          document.querySelector('input[name="date_info"]').value = entry.date_info;
+          document.querySelector('textarea[name="event_info"]').value = entry.event_info;
+          document.getElementById('formTitle').textContent = 'Edit Entry';
+          showForm();
+        }
+
+        function deleteEntry(index) {
+          fetch('/delete-entry', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ index: index })
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              console.log('Deleted entry:', data.deleted);
+              console.log('Updated entries:', data.entries);
+              loadEntries();
+            } else {
+              console.error('Error:', data.error);
+            }
+          })
+          .catch(error => console.error('Error:', error));
+        }
+    
+        // Event listeners.
+        document.getElementById('addEntryBtn').addEventListener('click', () => {
+          hideForm(); // Clear any previous form data.
+          showForm();
+        });
+        document.getElementById('cancelBtn').addEventListener('click', hideForm);
+    
+        document.getElementById('entryForm').addEventListener('submit', function(e) {
+          e.preventDefault();
+        
+          const form = document.getElementById('entryForm');
+          const formData = new FormData(form);
+        
+          const isEdit = formData.get('entry_index');  // optional
+        
+          const endpoint = isEdit ? '/edit-entry' : '/add-entry';
+        
+          fetch(endpoint, {
+            method: 'POST',
+            body: formData
+          })
+            .then(response => response.json())
+            .then(data => {
+              if (data.success) {
+                renderEntries(data.entries);
+              } else {
+                console.error('Error:', data.error);
+              }
+            })
+            .catch(error => console.error('Error:', error));
+        
+          hideForm();
+        });
+    
+        // Load entries when the page loads.
+        window.addEventListener('load', loadEntries);
+      </script>
+</body>
+</html>
