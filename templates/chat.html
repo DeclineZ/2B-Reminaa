@@ -178,8 +178,17 @@
           const transcriptDisplay = document.getElementById('transcript');
       
           recordBtn.addEventListener('click', () => {
+            // Prevent double-clicking within 3 seconds
+            if (recordBtn.disabled) return;
+          
+            recordBtn.disabled = true; // Disable the button right away
+          
+            setTimeout(() => {
+              // Don't re-enable here — leave it to another function
+              // console.log('Button can be re-enabled now by another function');
+            }, 3000); // 3 seconds timeout
+          
             if (!isRecording) {
-              // Starting a new recording session resets the transcript
               fullTranscript = "";
               transcriptDisplay.textContent = "Listening...";
               recognition.start();
@@ -189,19 +198,19 @@
               recognition.stop();
               isRecording = false;
               recordBtn.textContent = "Start Recording";
+          
               fetch("/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ message: fullTranscript })
               })
-                .then(response => response.json())
-                .then(data => {
-                  // The MutationObserver will trigger the typing animation when updating this element.
-                  document.getElementById('assistantResponse').innerText = data.reply;
-                })
-                .catch(error => {
-                  console.error("Error:", error);
-                });
+              .then(response => response.json())
+              .then(data => {
+                document.getElementById('assistantResponse').innerText = data.reply;
+              })
+              .catch(error => {
+                console.error("Error:", error);
+              });
             }
           });
       
