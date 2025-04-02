@@ -54,29 +54,37 @@
           if (text.trim()) {
             responsiveVoice.cancel();
             speaking = true;
-            document.getElementById('recordButton').disabled = true;
+            const recordBtn = document.getElementById('recordButton');
+            recordBtn.disabled = true;
+        
+            let enabled = false;
+            const enableOnce = () => {
+              if (!enabled) {
+                recordBtn.disabled = false;
+                speaking = false;
+                enabled = true;
+                console.log("Button re-enabled (onend or timeout).");
+              }
+            };
         
             const speakNow = () => {
               responsiveVoice.speak(text, "Thai Male", {
                 onend: function () {
-                  speaking = false;
-                  document.getElementById('recordButton').disabled = false;
-                  console.log("Speech has ended.");
+                  console.log("responsiveVoice onend fired");
+                  enableOnce();
                 }
               });
+        
+              // Failsafe: if onend doesn't fire within 6s (first time bug)
+              setTimeout(() => {
+                console.log("Failsafe timeout fired");
+                enableOnce();
+              }, 6000);
             };
         
             if (!hasSpokenBefore) {
               hasSpokenBefore = true;
-              
-              speakNow(); // 100ms usually works
-
-              setTimeout(() => {
-                speaking = false;
-                document.getElementById('recordButton').disabled = false;
-                console.log("Speech has ended.");
-              }, 6000);
-              
+              speakNow();
             } else {
               speakNow();
             }
@@ -178,16 +186,6 @@
           const transcriptDisplay = document.getElementById('transcript');
       
           recordBtn.addEventListener('click', () => {
-            // Prevent double-clicking within 3 seconds
-            if (recordBtn.disabled) return;
-          
-            recordBtn.disabled = true; // Disable the button right away
-          
-            setTimeout(() => {
-              // Don't re-enable here — leave it to another function
-              // console.log('Button can be re-enabled now by another function');
-            }, 3000); // 3 seconds timeout
-          
             if (!isRecording) {
               fullTranscript = "";
               transcriptDisplay.textContent = "Listening...";
@@ -199,6 +197,8 @@
               isRecording = false;
               recordBtn.textContent = "Start Recording";
           
+              recordBtn.disabled = true; // Disable here — but do NOT re-enable after 3s anymore!
+          
               fetch("/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -207,6 +207,7 @@
               .then(response => response.json())
               .then(data => {
                 document.getElementById('assistantResponse').innerText = data.reply;
+                // Typing animation will trigger speakText() → which will re-enable the button
               })
               .catch(error => {
                 console.error("Error:", error);
