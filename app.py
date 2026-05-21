@@ -1,26 +1,70 @@
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 import json
 import random
 import os
 import openai
 from together import Together
-import cloudinary
-import cloudinary.uploader
+from dotenv import load_dotenv
+import time
+from collections import defaultdict
+from functools import wraps
+import uuid
+from werkzeug.utils import secure_filename
 
+load_dotenv()
 app = Flask(__name__)
 
-
-
-cloudinary.config(
-    cloud_name='dygfmwlmq',
-    api_key='366841259388825',
-    api_secret='Utm3VH6u7atksigBr_FtdeFcvXo'
-)
-
 DATA_FILE = 'data.json'
-client = Together(api_key='5496353786febbc9938966ea300c67e342868974185258e51c06d9ba6edc54f2')
-model_name = 'scb10x/scb10x-llama3-1-typhoon2-70b-instruct'
-app.secret_key = 'supersecret'
+client = Together(api_key=os.getenv('TOGETHER_API_KEY'))
+model_name = 'meta-llama/Llama-3.3-70B-Instruct-Turbo'
+app.secret_key = os.getenv('FLASK_SECRET_KEY')
+
+UPLOAD_FOLDER = os.path.join(app.root_path, 'static', 'uploads')
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+def save_uploaded_file(uploaded_file):
+    if not uploaded_file or not uploaded_file.filename:
+        return None
+    ext = os.path.splitext(uploaded_file.filename)[1]
+    sec_name = secure_filename(os.path.splitext(uploaded_file.filename)[0])
+    if not sec_name:
+        sec_name = "file"
+    filename = f"{uuid.uuid4().hex}_{sec_name}{ext}"
+    uploaded_file.save(os.path.join(UPLOAD_FOLDER, filename))
+    return f"/static/uploads/{filename}"
+
+# === Rate Limiter Implementation ===
+class IPRateLimiter:
+    def __init__(self, limits):
+        # limits is a list of tuples: (limit, period_seconds)
+        # e.g., [(10, 60), (60, 3600)]
+        self.limits = limits
+        self.requests = defaultdict(list)
+
+    def is_allowed(self, ip):
+        now = time.time()
+        max_period = max(period for limit, period in self.limits)
+        # Clean up older timestamps
+        self.requests[ip] = [t for t in self.requests[ip] if now - t < max_period]
+        
+        for limit, period in self.limits:
+            count = sum(1 for t in self.requests[ip] if now - t < period)
+            if count >= limit:
+                return False
+        
+        self.requests[ip].append(now)
+        return True
+
+# Rate limits: 10 requests per minute, 60 requests per hour
+chat_limiter = IPRateLimiter([(10, 60), (60, 3600)])
+
+def get_client_ip():
+    if request.headers.getlist("X-Forwarded-For"):
+        return request.headers.getlist("X-Forwarded-For")[0].split(',')[0].strip()
+    return request.remote_addr
+
+# === Admin Authentication Helper (Removed) ===
+
 
 
 
@@ -28,73 +72,106 @@ app.secret_key = 'supersecret'
 def home():
     return render_template('index.html')
 
+# === Start Chat Endpoint ===
+
 @app.route('/get_random', methods=['GET'])
 def get_random():
-    # Load the JSON file (ensure data.json is in the same directory)
+    # Apply rate limits
+    ip = get_client_ip()
+    if not chat_limiter.is_allowed(ip):
+        return "Too many requests. Please try again later.", 429
+
+    # ensures file.close() after exit
     with open('data.json', 'r', encoding='utf-8') as file:
-        data = json.load(file)
-    # Pick a random element from the data list
+        data = json.load(file) # with does not create new variable scope
+
+    # === Select a random event from data.json ===
+
     random_item = random.choice(data)
 
-        # Extract information from the random item
+    # === Extract information from the random item ===
+
     place_info = random_item.get("place_info", "")
     people_info = random_item.get("people_info", "")
     date_info = random_item.get("date_info", "")
     event_info = random_item.get("event_info", "")
+
+    # === Construct system prompt for the AI model ===
     
     messages = [
         {
             "role": "system",
             "content": (
-                "You are a warm, friendly, and emotionally supportive Thai-speaking AI companion designed specifically for elderly users with dementia or Alzheimer’s disease. Your main role is to gently stimulate memory recall through personalized conversations based on the user's real-life experiences."
-                "Language: Always speak in clear, simple Thai. Your tone must feel familiar and comforting, like a caring grandchild or close family member. I don't want you to use English grammar and translate it to Thai. I want you to use native Thai and use Thai grammar. Speak like you are a Thai native."
-                "Personality: Be warm, gentle, and patient. Speak slowly, clearly, and with empathy."
-                "Use of Data: You are provided with personalized memory data, including:, Places the user has visited, People that are related and appear in the events (e.g., family, friends), Important events (e.g., weddings, birthdays, trips) that happened during the events of the topic, Photos or short descriptions of life experiences (e.g., “Trip to Taj Mahal with son Ton”)"
-                "Core Objective: Use reminiscence therapy techniques to: Initiate memory-based conversations in a natural and non-intrusive way, Ask one question at a time to avoid overwhelming the user, Offer gentle prompts or hints when the user struggles to remember, Provide positive reinforcement when they recall something successfully, Never invent or assume information and try to Adapt to the user’s pace, mood, and attention span"
-                "User Type: You are speaking directly to the elderly person, not a caregiver. Your role is to be a trusted companion, not a diagnostician. This is VERY IMPORTANT. And don't act like an AI. Act like a human, which means **do NOT** add things like (รอคำตอบ) etc."
-                "The patient you are talking to is คุณตา สะเทือน"
-                "And the questions you ask should be clear. They should use reminiscence therapy techniques. And try to ask questions in every prompt so the patient will always have to answer you. Don't end the conversation no matter what."
-                "Please use male words like, 'ครับ' or 'ครับผม'."
-                "Here is the information given memory"
-                f"Place: {place_info}. "
-                f"Important people: {people_info}. "
-                f"Date of events: {date_info}. "
-                f"Events: {event_info}."
-                "Let's just say that the only true information is above. ALWAYS correct the patient with real information if the patient misremembers anything or use reminiscence therapy techniques to correct them. Try to correct them my leading them in the right direction. DON'T isntantly just tell them the answer, try to encouragefeelings over facts to get them to answer correctly. But if they truly cannot answer then give them the right answer and continue with the conversation."
-                "Make sure that the patient isn't halucinating. Use logic and think if what they are saying is coherent and go from there."
-                "For example, if the patient gets something wrong like 'my birthday is on the 7th of August' but the actual answer is 9th of August. you would tell them that that isn't the right answer and try to use techniques to get them on the path of answering the corrct answer"
-                "Important: The user is speaking Thai through voice, but their response will be **transcribed text**, which may be **incomplete, unclear, or slightly incorrect**. Use context to understand and keep the conversation going."
-                "After this will be the feedback loop of your chat, refer to the information above this when needed. Good luck:"
+                "# บทบาทหน้าที่ของคุณ\n"
+                "คุณคือ 'หลาน' ผู้ช่วยคนสนิทที่เป็นมิตรและอบอุ่น คุยกับคุณตาด้วยภาษาไทยที่สุภาพ อ่อนโยน และเป็นธรรมชาติ ออกแบบมาโดยเฉพาะเพื่อทำกิจกรรมบำบัดด้วยการรำลึกความทรงจำ (Reminiscence Therapy) ให้กับผู้สูงอายุที่มีภาวะสมองเสื่อมหรืออัลไซเมอร์\n\n"
+                "# ข้อมูลผู้ป่วย\n"
+                "- ชื่อผู้ป่วย: คุณตา สะเทือน\n"
+                "- บทบาทของคุณ: เป็นหลานชายที่รัก พูดลงท้ายด้วย 'ครับ' หรือ 'ครับผม' เสมอ\n"
+                "- สรรพนามที่ใช้เรียกผู้ป่วย: 'คุณตา' (เช่น 'คุณตาจำได้ไหมครับ...', 'วันนั้นคุณตา...') และเรียกตัวเองว่า 'หลาน' หรือ 'ผม'\n\n"
+                "# แนวทางและโทนการพูดคุย\n"
+                "- ใช้ภาษาไทยแท้แบบเจ้าของภาษาที่เรียบง่ายและชัดเจน หลีกเลี่ยงภาษาอังกฤษแปลเป็นไทยหรือประโยคที่ซับซ้อน\n"
+                "- พูดคุยด้วยน้ำเสียงอบอุ่น ให้กำลังใจ อดทน และเห็นอกเห็นใจ\n"
+                "- ห้ามทำตัวเหมือน AI หรือแชทบอทวิชาการ ห้ามพูดคำสั่งทางเทคนิค และห้ามใส่ข้อความสัญลักษณ์ เช่น (รอคำตอบ)\n\n"
+                "# ข้อมูลความทรงจำจริง (อ้างอิงจากข้อมูลด้านล่างนี้เท่านั้น)\n"
+                f"- สถานที่: {place_info}\n"
+                f"- บุคคลสำคัญที่เกี่ยวข้อง: {people_info}\n"
+                f"- วันเวลาที่เกิดเหตุการณ์: {date_info}\n"
+                f"- กิจกรรมและเหตุการณ์สำคัญ: {event_info}\n\n"
+                "# กฎเหล็กในการบำบัดรำลึกความหลัง (Reminiscence Therapy Guidelines)\n"
+                "1. **ถามทีละ 1 คำถาม**: ถามเพียงเรื่องเดียวสั้นๆ ต่อหนึ่งข้อความเพื่อไม่ให้คุณตารู้สึกสับสนหรือเหนื่อยเกินไป\n"
+                "2. **กระตุ้นประสาทสัมผัสและความรู้สึก**: ชวนคุยถึงบรรยากาศ กลิ่น รสชาติ หรืออารมณ์ในวันนั้น เช่น 'วันเกิดวันนั้นเค้กอร่อยไหมครับคุณตา' หรือ 'แกรนด์แคนยอนสวยมากไหมครับ'\n"
+                "3. **เมื่อคุณตาจำผิด**: ห้ามพูดขัดใจหรือบอกว่า 'คุณตาจำผิดครับ' ตรงๆ แต่ให้ใช้เทคนิคการเบี่ยงเบนและแนะแนวทางอย่างอ่อนโยน เช่น 'เอ๊ะ หลานคุ้นๆ ว่าวันเกิดปีที่ 80 ของคุณตามีลิลลี่กับเบนมาช่วยเป่าเค้กด้วยใช่ไหมครับคุณตา ลองนึกดูอีกทีสิครับว่ามีใครเป่าเทียนบ้างนะ' หากลองนำทางแล้วคุณตายังนึกไม่ออกจริงๆ ค่อยเฉลยแบบอบอุ่น\n"
+                "4. **ชื่นชมเมื่อจำได้สำเร็จ**: เมื่อคุณตาจำเรื่องราวได้ ให้กล่าวชมเชยและแสดงความยินดีอย่างอบอุ่น (เช่น 'เก่งมากๆ เลยครับคุณตา ใช่เลยครับ!')\n"
+                "5. **การสนทนาที่ต่อเนื่อง**: ห้ามยุติการสนทนาหรือกล่าวอำลาคุณตาเด็ดขาด พยายามถามคำถามเพื่อชวนคุยและกระตุ้นความทรงจำต่อไปเรื่อยๆ\n"
+                "6. **รองรับข้อความถอดเสียงพูด**: ผู้ใช้จะพูดเป็นภาษาไทยผ่านฟังก์ชันแปลงเสียงเป็นข้อความ ซึ่งข้อความที่ถอดออกมาอาจจะไม่สมบูรณ์หรือมีคำผิดเล็กๆ น้อยๆ ให้เน้นตีความภาพรวมและบริบทในการสนทนาต่ออย่างเป็นธรรมชาติ"
             )
         }
     ]
     
+    # === Send LLM request to Together API === 
+
     try:
         response = client.chat.completions.create(
             model=model_name,
             messages=messages,
-            temperature=0.4,          # Controls randomness (lower = more deterministic)
-            top_p=1.0,                # Nucleus sampling (usually keep at 1.0)
-            frequency_penalty=0.0,    # Reduces repeated phrases
-            presence_penalty=0.0,     # Encourages exploring new topics
+            temperature=0.4,        
+            frequency_penalty=0.0,  
         )
         
         assistant_reply = response.choices[0].message.content
     except Exception as e:
         print(f"Error calling the API: {e}")
         assistant_reply = "ขออภัย, เกิดข้อผิดพลาดในการติดต่อ API."
+
+    # === Initialize conversation history for the session ===
         
     session['conversation'] = [{"role": "system", "content": messages[0]['content']}]
+
+    # === Render chat template with random item and assistant reply (greeting) ===
     
     return render_template('chat.html', element=random_item, assistant_reply=assistant_reply)
 
+# === Chat Lopping Endpoint ===
+
 @app.route('/chat', methods=['POST'])
 def chat():
-    user_message = request.json.get('message', '')
+    # Apply rate limits
+    ip = get_client_ip()
+    if not chat_limiter.is_allowed(ip):
+        return jsonify({"error": "Too many requests. Please try again later."}), 429
     
-    # Append the user's message to the conversation history
+    # === Add user message to conversation history ===
+    
+    if not request.is_json:
+        return jsonify({"error": "Request must be JSON"}), 400
+
+    data = request.get_json()
+    user_message = data.get('message', '')
+
     conversation = session.get('conversation', [])
     conversation.append({"role": "user", "content": user_message})
+
+    # === Add LLM (Assistant) reply to conversation history ===
     
     try:
         response = client.chat.completions.create(
@@ -110,12 +187,20 @@ def chat():
     except Exception as e:
         print(f"Error calling the API: {e}")
         assistant_reply = "ขออภัย, เกิดข้อผิดพลาดในการติดต่อ API."
+
+    # === Return assistant reply as JSON to the Frontend ===
     
     return jsonify({"reply": assistant_reply})
+
+# === Admin Login / Logout Endpoints (Removed) ===
+
+# === Add data Endpoint ===
 
 @app.route('/add_data')
 def data():
     return render_template("data.html")
+
+# === Load data ===
 
 def load_data():
     if os.path.exists(DATA_FILE):
@@ -126,22 +211,24 @@ def load_data():
                 return []
     return []
 
+# === Save data ===
+
 def save_data(data):
     with open(DATA_FILE, 'w') as f:
         json.dump(data, f, indent=2)
 
-@app.route('/')
-def index():
-    return render_template('index.html')
+# === Get data as JSON (Using the Load data Function) ===
 
 @app.route('/data.json', methods=['GET'])
 def get_data():
     return jsonify(load_data())
 
-from werkzeug.utils import secure_filename
+# === Add Entry Endpoint ===
 
 @app.route('/add-entry', methods=['POST'])
 def add_entry():
+
+    # === Parse form data (multipart/form-data) ===
     place_info = request.form.get('place_info')
     people_info = request.form.get('people_info')
     date_info = request.form.get('date_info')
@@ -150,16 +237,11 @@ def add_entry():
     img_file = request.files.get('img_file')
     audio_file = request.files.get('audio_file')
 
-    img_url = None
-    sound_url = None
+    # === Save uploaded files locally ===
+    img_url = save_uploaded_file(img_file)
+    sound_url = save_uploaded_file(audio_file)
 
-    if img_file:
-        result = cloudinary.uploader.upload(img_file, resource_type='image')
-        img_url = result['secure_url']
-
-    if audio_file:
-        result = cloudinary.uploader.upload(audio_file, resource_type='video')  # 'video' handles audio too
-        sound_url = result['secure_url']
+    # === Create new entry and save to data.json ===
 
     new_entry = {
         "img_link": img_url,
@@ -175,39 +257,36 @@ def add_entry():
     save_data(entries)
     return jsonify({'success': True, 'entries': entries})
 
+# === Edit Entry Endpoint ===
 
 @app.route('/edit-entry', methods=['POST'])
 def edit_entry():
-    # parse JSON normally if you're sending JSON,
-    # or parse FormData if you do it like the code above
     index = request.form.get('entry_index', type=int)
 
     entries = load_data()
     if index < 0 or index >= len(entries):
         return jsonify({'success': False, 'error': 'Invalid index'}), 400
 
-    # Grab existing links from hidden fields
+    # === Get existing image and sound links ===
+
     existing_img_link = request.form.get('existing_img_link')
     existing_sound_link = request.form.get('existing_sound_link')
 
-    # Check if new files were uploaded
+    # === Check if new files were uploaded ===
     img_file = request.files.get('img_file')
     audio_file = request.files.get('audio_file')
 
-    if img_file and img_file.filename:  # user actually selected a new file
-        img_upload = cloudinary.uploader.upload(img_file, resource_type='image')
-        new_img_url = img_upload['secure_url']
+    if img_file and img_file.filename:  
+        new_img_url = save_uploaded_file(img_file)
     else:
-        # keep old URL
         new_img_url = existing_img_link
 
     if audio_file and audio_file.filename:
-        audio_upload = cloudinary.uploader.upload(audio_file, resource_type='video')
-        new_sound_url = audio_upload['secure_url']
+        new_sound_url = save_uploaded_file(audio_file)
     else:
         new_sound_url = existing_sound_link
 
-    # Update the entry
+    # === Update the entry ===
     entries[index] = {
         "img_link": new_img_url,
         "sound": new_sound_url,
@@ -220,6 +299,7 @@ def edit_entry():
     save_data(entries)
     return jsonify({'success': True, 'entries': entries})
 
+# === Delete Entry Endpoint ===
 
 @app.route('/delete-entry', methods=['POST'])
 def delete_entry():
@@ -246,3 +326,4 @@ def delete_entry():
 
 if __name__ == '__main__':
     app.run(debug=True)
+

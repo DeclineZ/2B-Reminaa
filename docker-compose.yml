@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: remina_chatbot
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    volumes:
+      - ./data.json:/app/data.json
+      - ./data:/app/data
+      - ./static/uploads:/app/static/uploads
+    restart: always

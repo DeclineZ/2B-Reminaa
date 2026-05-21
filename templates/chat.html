@@ -1,27 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat</title>
-    <link rel="stylesheet" href="../static/styles.css">
-    <link
-    rel="stylesheet"
-    href="{{ url_for('static', filename='../static/assets/bootstrap/css/bootstrap.min.css') }}"
-    >
-    <link
-        rel="stylesheet"
-        href="{{ url_for('static', filename='../static/assets/fonts/fontawesome-all.min.css') }}"
-    >
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai+Looped&display=swap">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='assets/bootstrap/css/bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='assets/fonts/fontawesome-all.min.css') }}">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai+Looped&display=swap">
 </head>
+
 <body>
   <nav class="navbar">
     <div class="logo">
-        <img src="https://c8.alamy.com/comp/ERAWHT/old-man-with-a-big-beard-and-a-smile-on-white-background-ERAWHT.jpg" alt="" style="max-height: 50px; border-radius: 50px;">
-        <strong>คุณตา สะเทือน</strong>
+      <img src="https://c8.alamy.com/comp/ERAWHT/old-man-with-a-big-beard-and-a-smile-on-white-background-ERAWHT.jpg"
+        alt="" style="max-height: 50px; border-radius: 50px;">
+      <strong>คุณตา สะเทือน</strong>
     </div>
-    <div class="home"><a href="/" style="text-decoration:none; color: #7F8AFF; font-size: 35px">  ⏏  </a></div>
+    <div class="home"><a href="/" style="text-decoration:none; color: #7F8AFF; font-size: 35px"> ⏏ </a></div>
     <div class="profile">
       <button onclick="window.location.href='/add_data'">+ สำหรับผู้ดูแล</button>
     </div>
@@ -32,209 +29,250 @@
         <source src="{{ element.sound }}" type="audio/mpeg">
         Your browser does not support the audio element.
       </audio>
-        <img src="{{ element.img_link }}" alt="Random Image" class="responsive-img" style="margin-bottom: 20px;">
-      </div>
-    
-      <button id="recordButton" class="pulse fade-in-delayed" onclick="toggleRecording()">Start</button>
-    
-      <div class="text-box fade-in-delayed">
-        <p id="assistantResponse" class="typing">{{ assistant_reply }}</p>
-      </div>
-    
-      <div id="transcript" class="transcript-box"></div>
+      <img src="{{ element.img_link }}" alt="Random Image" class="responsive-img" style="margin-bottom: 20px;">
+    </div>
+
+    <button id="recordButton" class="pulse fade-in-delayed" onclick="toggleRecording()">Start</button>
+
+    <div class="text-box fade-in-delayed">
+      <p id="assistantResponse" class="typing">{{ assistant_reply }}</p>
+    </div>
+
+    <div id="transcript" class="transcript-box"></div>
   </div>
   <div class="powered-by">powered by Typhoon V2</div>
 
-      <script>
-        let speaking = false;
-        let hasSpokenBefore = false;
+  <script src="{{ url_for('static', filename='assets/bootstrap/js/bootstrap.min.js') }}"></script>
+  <script src="https://code.responsivevoice.org/responsivevoice.js?key=jFvG5zaR"></script>
 
-        // Speech synthesis function
-        function speakText(text) {
-          if (text.trim()) {
-            responsiveVoice.cancel();
-            speaking = true;
-            const recordBtn = document.getElementById('recordButton');
-            recordBtn.disabled = true;
-        
-            let enabled = false;
-            const enableOnce = () => {
-              if (!enabled) {
-                recordBtn.disabled = false;
-                speaking = false;
-                enabled = true;
-                console.log("Button re-enabled (onend or timeout).");
-              }
-            };
-        
-            const speakNow = () => {
-              responsiveVoice.speak(text, "Thai Male", {
-                onend: function () {
-                  console.log("responsiveVoice onend fired");
-                  enableOnce();
-                }
-              });
-        
-              // Failsafe: if onend doesn't fire within 6s (first time bug)
-              setTimeout(() => {
-                console.log("Failsafe timeout fired");
-                enableOnce();
-              }, 6000);
-            };
-        
-            if (!hasSpokenBefore) {
-              hasSpokenBefore = true;
-              speakNow();
-            } else {
-              speakNow();
+  <script>
+    // === UI States ===
+    const STATE_IDLE = 'idle';
+    const STATE_LISTENING = 'listening';
+    const STATE_PROCESSING = 'processing';
+    const STATE_SPEAKING = 'speaking';
+    let currentState = STATE_IDLE;
+
+    let recognition;
+    let isRecording = false;
+    let fullTranscript = "";
+
+    const recordBtn = document.getElementById('recordButton');
+    const transcriptDisplay = document.getElementById('transcript');
+    const responseEl = document.getElementById('assistantResponse');
+
+    // === Update UI based on current State ===
+    function setUIState(state) {
+      currentState = state;
+      if (state === STATE_IDLE) {
+        recordBtn.disabled = false;
+        recordBtn.innerText = "Start";
+        recordBtn.classList.remove("listening");
+      } else if (state === STATE_LISTENING) {
+        recordBtn.disabled = false;
+        recordBtn.innerText = "Stop";
+        recordBtn.classList.add("listening");
+      } else if (state === STATE_PROCESSING) {
+        recordBtn.disabled = true;
+        recordBtn.innerText = "Thinking...";
+        recordBtn.classList.remove("listening");
+        transcriptDisplay.textContent = "กำลังส่งข้อมูล...";
+      } else if (state === STATE_SPEAKING) {
+        recordBtn.disabled = true;
+        recordBtn.innerText = "กำลังพูด";
+        recordBtn.classList.remove("listening");
+      }
+    }
+
+    // === Text-to-Speech (TTS) ===
+    function speakText(text, callback) {
+      let callbackCalled = false;
+      let checkInterval;
+      let timer;
+
+      function safeCallback() {
+        if (checkInterval) clearInterval(checkInterval);
+        if (timer) clearTimeout(timer);
+        if (!callbackCalled) {
+          callbackCalled = true;
+          if (callback) callback();
+        }
+      }
+
+      if (typeof responsiveVoice !== 'undefined' && text.trim()) {
+        responsiveVoice.cancel();
+
+        const startTime = Date.now();
+        // Fallback timeout: estimate speaking duration based on character length.
+        // Approx. 200ms per character, minimum 4000ms.
+        const durationEstimate = Math.max(4000, text.length * 200);
+        timer = setTimeout(() => {
+          console.warn("responsiveVoice speech timed out, executing fallback callback");
+          responsiveVoice.cancel();
+          safeCallback();
+        }, durationEstimate);
+
+        responsiveVoice.speak(text, "Thai Male", {
+          onend: function () {
+            console.log("responsiveVoice onend fired");
+            safeCallback();
+          },
+          onerror: function (e) {
+            console.error("responsiveVoice error", e);
+            safeCallback();
+          }
+        });
+
+        // Polling check to see if speaking finished or failed to start
+        let playCheckStarted = false;
+        checkInterval = setInterval(() => {
+          if (responsiveVoice.isPlaying()) {
+            playCheckStarted = true;
+          } else {
+            // If it was playing and stopped, or if it failed to start playing within 2 seconds
+            if (playCheckStarted || (Date.now() - startTime > 2000)) {
+              console.log("responsiveVoice polling detected end of speech or failure to start");
+              safeCallback();
             }
           }
+        }, 150);
+      } else {
+        safeCallback();
+      }
+    }
+
+    // === Typing Animation ===
+    function typeOutText(el, text, speed = 15) {
+      return new Promise((resolve) => {
+        el.innerText = '';
+        if (!text || text.length === 0) {
+          resolve();
+          return;
         }
-      
-        // Generic typing animation function that returns a Promise when done.
-        function typeOutText(el, text, speed = 30) {
-          return new Promise((resolve) => {
-            el.innerText = '';  // Clear current text
-            let i = 0;
-            const interval = setInterval(() => {
-              el.innerText += text[i];
-              i++;
-              if (i >= text.length) {
-                clearInterval(interval);
-                resolve();
-              }
-            }, speed);
-          });
-        }
-      
-        // Set up MutationObserver to trigger typing animation on updates
-        const AIchat = document.getElementById('assistantResponse');
-        if (AIchat) {
-          let observerDisabled = false; // Flag to prevent recursion during animation
-      
-          const observer = new MutationObserver((mutationsList) => {
-            if (observerDisabled) return;
-            // Get the updated text; note that multiple mutations might occur,
-            // so we use the current text content.
-            const newText = AIchat.textContent.trim();
-            if (newText) {
-              observerDisabled = true;
-              // Run the typing animation and then speak the text
-              typeOutText(AIchat, newText, 10).then(() => {
-                speakText(newText);
-                observerDisabled = false;
-              });
-            }
-          });
-      
-          const config = {
-            childList: true,
-            subtree: true,
-            characterData: true
-          };
-      
-          observer.observe(AIchat, config);
-      
-          // Also handle the initial text on window load
-          window.addEventListener('load', () => {
-            const initialText = AIchat.textContent.trim();
-            if (initialText) {
-              observerDisabled = true;
-              typeOutText(AIchat, initialText, 10).then(() => {
-                speakText(initialText);
-                observerDisabled = false;
-              });
-            }
-          });
-        } else {
-          console.warn("Element with ID 'assistantResponse' not found.");
-        }
-      </script>
-      
-      <script src="assets/bootstrap/js/bootstrap.min.js"></script>
-      
-      <script>
-        // Toggle recording button functionality remains unchanged
-        function toggleRecording() {
-          const btn = document.getElementById('recordButton');
-          if (speaking == false) {
-            if (btn.innerText === "Start") {
-              btn.innerText = "Stop";
-              btn.classList.add("listening");
-            } else {
-              btn.innerText = "Start";
-              btn.classList.remove("listening");
-            }
+        let i = 0;
+        const interval = setInterval(() => {
+          el.innerText += text[i];
+          i++;
+          if (i >= text.length) {
+            clearInterval(interval);
+            resolve();
           }
+        }, speed);
+      });
+    }
+
+    // === Toggle Recording / Button click handler ===
+    function toggleRecording() {
+      if (currentState === STATE_SPEAKING || currentState === STATE_PROCESSING) {
+        return;
+      }
+
+      if (currentState === STATE_IDLE) {
+        // Start recording
+        if (!recognition) {
+          transcriptDisplay.textContent = "เบราว์เซอร์ของคุณไม่สนับสนุนการจดจำเสียงพูด";
+          return;
         }
-      </script>
-      
-      <script>
-        // Check for SpeechRecognition API support
-        window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!window.SpeechRecognition) {
-          document.getElementById('transcript').innerText = "Sorry, your browser does not support Speech Recognition.";
-        } else {
-          const recognition = new SpeechRecognition();
-          recognition.continuous = true; // Keep listening for multiple phrases
-          recognition.lang = 'th-TH';
-          recognition.interimResults = false; // Only final results
-      
-          let isRecording = false;
-          let fullTranscript = ""; // Will hold the entire transcript for the session
-          const recordBtn = document.getElementById('recordButton');
-          const transcriptDisplay = document.getElementById('transcript');
-      
-          recordBtn.addEventListener('click', () => {
-            if (!isRecording) {
-              fullTranscript = "";
-              transcriptDisplay.textContent = "Listening...";
-              recognition.start();
-              isRecording = true;
-              recordBtn.textContent = "Stop Recording";
-            } else {
-              recognition.stop();
-              isRecording = false;
-              recordBtn.textContent = "Start Recording";
-          
-              recordBtn.disabled = true; // Disable here — but do NOT re-enable after 3s anymore!
-          
-              fetch("/chat", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: fullTranscript })
-              })
-              .then(response => response.json())
-              .then(data => {
-                document.getElementById('assistantResponse').innerText = data.reply;
-                // Typing animation will trigger speakText() → which will re-enable the button
-              })
-              .catch(error => {
-                console.error("Error:", error);
+        fullTranscript = "";
+        transcriptDisplay.textContent = "กำลังฟัง...";
+        try {
+          recognition.start();
+          isRecording = true;
+          setUIState(STATE_LISTENING);
+        } catch (e) {
+          console.error("Failed to start speech recognition:", e);
+          transcriptDisplay.textContent = "เกิดข้อผิดพลาดในการเปิดไมโครโฟน";
+        }
+      } else if (currentState === STATE_LISTENING) {
+        // Stop recording and process
+        if (recognition) {
+          recognition.stop();
+        }
+        isRecording = false;
+        setUIState(STATE_PROCESSING);
+      }
+    }
+
+    // === Speech Recognition Setup ===
+    window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!window.SpeechRecognition) {
+      transcriptDisplay.innerText = "ขออภัย เบราว์เซอร์ของคุณไม่รองรับเทคโนโลยีการจำเสียงพูด (Speech Recognition) กรุณาใช้ Chrome";
+    } else {
+      recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.lang = 'th-TH';
+      recognition.interimResults = false;
+
+      recognition.onresult = (event) => {
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          fullTranscript += event.results[i][0].transcript + " ";
+        }
+        transcriptDisplay.textContent = fullTranscript;
+      };
+
+      recognition.onerror = (event) => {
+        console.error("Speech recognition error:", event.error);
+        if (event.error !== 'no-speech') {
+          transcriptDisplay.textContent = "เกิดข้อผิดพลาด: " + event.error;
+          isRecording = false;
+          setUIState(STATE_IDLE);
+        }
+      };
+
+      recognition.onend = () => {
+        // When recognition stops (either user clicks Stop or recognition times out/stops naturally)
+        if (currentState === STATE_PROCESSING) {
+          // Send transcript to backend
+          fetch("/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: fullTranscript })
+          })
+          .then(response => {
+            if (response.status === 429) {
+              throw new Error("ส่งข้อความบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่ครับ");
+            }
+            if (!response.ok) {
+              throw new Error("เกิดข้อผิดพลาดจากเซิร์ฟเวอร์");
+            }
+            return response.json();
+          })
+          .then(data => {
+            if (data.error) {
+              throw new Error(data.error);
+            }
+            setUIState(STATE_SPEAKING);
+            typeOutText(responseEl, data.reply, 15).then(() => {
+              speakText(data.reply, () => {
+                setUIState(STATE_IDLE);
               });
-            }
+            });
+          })
+          .catch(error => {
+            console.error("Error during chat fetch:", error);
+            transcriptDisplay.textContent = error.message || "เกิดข้อผิดพลาดในการเชื่อมต่อ";
+            setUIState(STATE_IDLE);
           });
-      
-          recognition.onresult = (event) => {
-            // Append each new result to the full transcript
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-              fullTranscript += event.results[i][0].transcript + " ";
-            }
-            transcriptDisplay.textContent = fullTranscript;
-          };
-      
-          recognition.onerror = (event) => {
-            transcriptDisplay.textContent = "Error: " + event.error;
-            isRecording = false;
-            recordBtn.textContent = "Start Recording";
-          };
-      
-          recognition.onend = () => {
-            // Optionally auto-restart if needed.
-          };
+        } else {
+          isRecording = false;
+          setUIState(STATE_IDLE);
         }
-      </script>
-      
+      };
+    }
+
+    // === Initial Speech/Typing on page load ===
+    window.addEventListener('load', () => {
+      const initialText = responseEl.textContent.trim();
+      if (initialText) {
+        setUIState(STATE_SPEAKING);
+        typeOutText(responseEl, initialText, 15).then(() => {
+          speakText(initialText, () => {
+            setUIState(STATE_IDLE);
+          });
+        });
+      }
+    });
+  </script>
 </body>
-<script src="https://code.responsivevoice.org/responsivevoice.js?key=jFvG5zaR"></script>
+
 </html>

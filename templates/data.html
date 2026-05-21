@@ -4,15 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>เพิ่มข้อมูล</title>
-    <link rel="stylesheet" href="../static/styles.css">
-    <link
-    rel="stylesheet"
-    href="{{ url_for('static', filename='../static/assets/bootstrap/css/bootstrap.min.css') }}"
-    >
-    <link
-        rel="stylesheet"
-        href="{{ url_for('static', filename='../static/assets/fonts/fontawesome-all.min.css') }}"
-    >
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='assets/bootstrap/css/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='assets/fonts/fontawesome-all.min.css') }}">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai+Looped&display=swap">
 </head>
 <body>
@@ -24,7 +18,7 @@
         </div>
         <div class="home"><a href="/" style="text-decoration:none; color: #7F8AFF; font-size: 35px">  ⏏  </a></div>
         <div class="profile">
-          <button onclick="window.location.href='/add_data'">+ สำหรับผู้ดูแล</button>
+          <button onclick="window.location.href='/'">กลับหน้าหลัก</button>
         </div>
       </nav>
       <div class="contain2">

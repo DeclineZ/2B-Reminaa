@@ -1,0 +1,29 @@
+# Python virtual environment
+venv/
+.venv/
+ENV/
+
+# Python compiled cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Node dependencies
+node_modules/
+
+# Environment files with secrets
+.env
+
+# Local upload files and persistent data changes (only track the base templates if needed, but exclude user uploads)
+static/uploads/*
+!static/uploads/.gitkeep
+
+# IDE configs
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
