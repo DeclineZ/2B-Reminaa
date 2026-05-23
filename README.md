@@ -4,6 +4,7 @@
 
 <img width="1370" height="1005" alt="Award" src="https://github.com/user-attachments/assets/5157bd6a-cec9-45c6-9a3c-0aea9b040688" />
 
+
 Remina is an AI-powered voice chatbot designed to conduct **Reminiscence Therapy** for elderly patients suffering from dementia or Alzheimer's. The project leverages Large Language Models (LLMs) and personalized multimedia cues (photos and ambient audio) to stimulate memory recall, support cognitive engagement, and offer empathetic, warm companionship.
 
 This project was built during the **KMUTT 2B Camp** (2B-KMUTT) under the topic of **LLMs and Elderly Care**.
