@@ -15,7 +15,20 @@ load_dotenv()
 app = Flask(__name__)
 
 DATA_FILE = 'data.json'
-client = Together(api_key=os.getenv('TOGETHER_API_KEY'))
+class LazyTogether:
+    def __init__(self):
+        self._client = None
+
+    @property
+    def client(self):
+        if self._client is None:
+            self._client = Together(api_key=os.getenv('TOGETHER_API_KEY'))
+        return self._client
+
+    def __getattr__(self, name):
+        return getattr(self.client, name)
+
+client = LazyTogether()
 model_name = 'meta-llama/Llama-3.3-70B-Instruct-Turbo'
 app.secret_key = os.getenv('FLASK_SECRET_KEY')
 
