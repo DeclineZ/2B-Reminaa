@@ -1,18 +1,18 @@
-# Remina
+1# Remina
 
 Remina is an AI-powered voice chatbot designed to conduct **Reminiscence Therapy** for elderly patients suffering from dementia or Alzheimer's. The project leverages Large Language Models (LLMs) and personalized multimedia cues (photos and ambient audio) to stimulate memory recall, support cognitive engagement, and offer empathetic, warm companionship.
 
-This project was built during the **KMUTT 2B Camp** (2B-KMUTT) under the topic of **LLMs and Dementia**.
+This project was built during the **KMUTT 2B Camp** (2B-KMUTT) under the topic of **LLMs and Elderly Care**.
 
 ---
 
-## 🚀 Try It Out
+## Try It Out
 
 Experience Remina live in your browser: **[remina-chi.vercel.app](https://remina-chi.vercel.app/)**
 
 ---
 
-## 💡 Concept & Background
+## Concept & Background
 
 **Reminiscence Therapy** is a non-pharmacological treatment for dementia and Alzheimer's that encourages patients to discuss past events and life experiences, using tangible triggers such as familiar photographs, sounds, or music to stimulate brain activity.
 
@@ -20,10 +20,10 @@ During the KMUTT 2B Camp, this project was developed to explore the intersection
 
 ---
 
-## ✨ Features
+## Features
 
 - **Voice-First Interface**: Integrates the native browser **Web Speech API** for high-accuracy Speech-to-Text (STT) transcription, making the app highly accessible for seniors.
-- **Natural Thai Language Interaction**: Employs Typhoon (`scb10x-llama3-1-typhoon2-70b-instruct` / Llama-3.3-70B-Instruct-Turbo via Together AI) to deliver smooth, respectful, and culturally natural Thai conversational responses.
+- **Natural Thai Language Interaction**: Employs Typhoon (`scb10x-llama3-1-typhoon2-70b-instruct`) to deliver smooth, respectful, and culturally natural Thai conversational responses.
 - **Voice Output (TTS)**: Reads replies aloud using **ResponsiveVoice.js** using a warm Thai male voice.
 - **Context-Aware Prompts (Simplified RAG)**: Dynamic system prompts inject specific memory details (location, people, date, event) from local storage to ground the AI in reality and prevent hallucinations.
 - **Interactive Memory Cards**: Prominently displays personal images and plays nostalgic ambient/audio files to engage the patient's senses.
@@ -32,20 +32,16 @@ During the KMUTT 2B Camp, this project was developed to explore the intersection
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 - **Frontend**: HTML5, Vanilla CSS, Vanilla JavaScript
   - **Speech-to-Text (STT)**: Web Speech API (Browser Native)
   - **Text-to-Speech (TTS)**: ResponsiveVoice.js
 - **Backend**: Python (Flask)
-- **AI / LLM API**: Typhoon (via Together API)
-- **Database**: `data.json` (Local file-based JSON database for ease of use)
-- **Deployment**: Vercel-compatible (optimized with lazy initialization of dependencies)
-- **Containerization**: Docker & Docker Compose support
 
 ---
 
-## 📊 Conversation & Therapy Pipeline
+## Conversation & Therapy Pipeline
 
 ```mermaid
 graph TD
@@ -62,21 +58,18 @@ graph TD
 
 ---
 
-## ⚙️ Environment Variables Configuration
+## Environment Variables Configuration
 
 To run the project, create a `.env` file in the `app_project` directory with the following variables:
 
 ```ini
-CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
-CLOUDINARY_API_KEY=your_cloudinary_key
-CLOUDINARY_API_SECRET=your_cloudinary_secret
 TOGETHER_API_KEY=your_together_api_key
 FLASK_SECRET_KEY=your_flask_session_secret
 ```
 
 ---
 
-## 💻 Local Setup & Execution
+## Local Setup & Execution
 
 You can run Remina locally either using a Python virtual environment or Docker.
 
