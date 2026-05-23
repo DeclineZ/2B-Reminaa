@@ -1,16 +1,11 @@
-1# Remina
+# Remina
+
+**🏆 Awarded Best Research: 2B-KMUTT 20 Future Leader Camp**
+<img width="1370" height="1005" alt="Award" src="https://github.com/user-attachments/assets/5157bd6a-cec9-45c6-9a3c-0aea9b040688" />
 
 Remina is an AI-powered voice chatbot designed to conduct **Reminiscence Therapy** for elderly patients suffering from dementia or Alzheimer's. The project leverages Large Language Models (LLMs) and personalized multimedia cues (photos and ambient audio) to stimulate memory recall, support cognitive engagement, and offer empathetic, warm companionship.
 
 This project was built during the **KMUTT 2B Camp** (2B-KMUTT) under the topic of **LLMs and Elderly Care**.
-
----
-
-## Try It Out
-
-Experience Remina live in your browser: **[remina-chi.vercel.app](https://remina-chi.vercel.app/)**
-
----
 
 ## Concept & Background
 
@@ -18,19 +13,17 @@ Experience Remina live in your browser: **[remina-chi.vercel.app](https://remina
 
 During the KMUTT 2B Camp, this project was developed to explore the intersection of generative AI and dementia care. Remina is designed to act as a patient and caring virtual **"grandchild"**. It features a voice-first interface, which is critical for senior users who may find typing difficult, allowing them to interact naturally through spoken language.
 
----
-
 ## Features
+<img width="1920" height="1080" alt="Features" src="https://github.com/user-attachments/assets/390a50c1-2b1d-4d61-a2c2-cabd937ed482" />
 
 - **Voice-First Interface**: Integrates the native browser **Web Speech API** for high-accuracy Speech-to-Text (STT) transcription, making the app highly accessible for seniors.
 - **Natural Thai Language Interaction**: Employs Typhoon (`scb10x-llama3-1-typhoon2-70b-instruct`) to deliver smooth, respectful, and culturally natural Thai conversational responses.
 - **Voice Output (TTS)**: Reads replies aloud using **ResponsiveVoice.js** using a warm Thai male voice.
 - **Context-Aware Prompts (Simplified RAG)**: Dynamic system prompts inject specific memory details (location, people, date, event) from local storage to ground the AI in reality and prevent hallucinations.
 - **Interactive Memory Cards**: Prominently displays personal images and plays nostalgic ambient/audio files to engage the patient's senses.
-- **Safety & Rate Limiting**: Includes client IP-based rate limiting on chat endpoints to prevent API abuse.
-- **Memory Data Manager**: A built-in caregiver dashboard at `/add_data` that makes it simple to add, edit, and delete patient memory records.
 
----
+<img width="1920" height="1080" alt="Adding memories" src="https://github.com/user-attachments/assets/afc89510-58d6-4b9e-ad8b-9664cf96bbd3" />
+- Simply add a memory for the AI to use as context for the chats
 
 ## Tech Stack
 
@@ -38,8 +31,6 @@ During the KMUTT 2B Camp, this project was developed to explore the intersection
   - **Speech-to-Text (STT)**: Web Speech API (Browser Native)
   - **Text-to-Speech (TTS)**: ResponsiveVoice.js
 - **Backend**: Python (Flask)
-
----
 
 ## Conversation & Therapy Pipeline
 
@@ -56,7 +47,9 @@ graph TD
     I --> C
 ```
 
----
+## Try It Out
+
+Experience Remina live in your browser: **[remina-chi.vercel.app](https://remina-chi.vercel.app/)**
 
 ## Environment Variables Configuration
 
