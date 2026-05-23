@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_from_directory
 import json
 import random
 import os
@@ -15,6 +15,19 @@ load_dotenv()
 app = Flask(__name__)
 
 DATA_FILE = 'data.json'
+# For read-only environments like Vercel, copy data.json to /tmp and use it
+IS_READ_ONLY = not os.access(app.root_path, os.W_OK)
+if IS_READ_ONLY or os.environ.get('VERCEL'):
+    DATA_FILE = '/tmp/data.json'
+    if not os.path.exists(DATA_FILE):
+        import shutil
+        try:
+            if os.path.exists(os.path.join(app.root_path, 'data.json')):
+                shutil.copy(os.path.join(app.root_path, 'data.json'), DATA_FILE)
+            elif os.path.exists('data.json'):
+                shutil.copy('data.json', DATA_FILE)
+        except Exception as e:
+            print(f"Failed to copy data.json to /tmp: {e}")
 class LazyTogether:
     def __init__(self):
         self._client = None
@@ -33,7 +46,13 @@ model_name = 'meta-llama/Llama-3.3-70B-Instruct-Turbo'
 app.secret_key = os.getenv('FLASK_SECRET_KEY')
 
 UPLOAD_FOLDER = os.path.join(app.root_path, 'static', 'uploads')
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+if IS_READ_ONLY or os.environ.get('VERCEL'):
+    UPLOAD_FOLDER = '/tmp/uploads'
+
+try:
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+except Exception as e:
+    print(f"Failed to create UPLOAD_FOLDER: {e}")
 
 def save_uploaded_file(uploaded_file):
     if not uploaded_file or not uploaded_file.filename:
@@ -45,6 +64,10 @@ def save_uploaded_file(uploaded_file):
     filename = f"{uuid.uuid4().hex}_{sec_name}{ext}"
     uploaded_file.save(os.path.join(UPLOAD_FOLDER, filename))
     return f"/static/uploads/{filename}"
+
+@app.route('/static/uploads/<filename>')
+def serve_uploaded_file(filename):
+    return send_from_directory(UPLOAD_FOLDER, filename)
 
 # === Rate Limiter Implementation ===
 class IPRateLimiter:
